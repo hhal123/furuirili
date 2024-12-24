@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>东南亚电商日历</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="calendar-data.js"></script>
+    <script src="script.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="calendar-container">
+            <h1 class="calendar-title">弗睿营销日历</h1>
+            <div class="calendar-header">
+                <button id="prevMonth"><i class="fas fa-chevron-left"></i></button>
+                <div class="header-center">
+                    <h2 id="currentMonth"></h2>
+                    <button id="todayBtn" class="today-btn">
+                        <i class="fas fa-calendar-day"></i>
+                        回到今天
+                    </button>
+                </div>
+                <button id="nextMonth"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="region-filter">
+                <label><input type="checkbox" value="all" checked> 全部</label>
+                <label><input type="checkbox" value="thailand"> 泰国</label>
+                <label><input type="checkbox" value="malaysia"> 马来西亚</label>
+                <label><input type="checkbox" value="indonesia"> 印尼</label>
+                <label><input type="checkbox" value="philippines"> 菲律宾</label>
+            </div>
+            <div class="calendar-grid">
+                <div class="weekday">日</div>
+                <div class="weekday">一</div>
+                <div class="weekday">二</div>
+                <div class="weekday">三</div>
+                <div class="weekday">四</div>
+                <div class="weekday">五</div>
+                <div class="weekday">六</div>
+                <div id="calendar-days"></div>
+            </div>
+            <div class="calendar-actions">
+                <button id="addEventBtn">添加新事件</button>
+                <button id="importDataBtn">导入数据</button>
+                <button id="clearDataBtn">清空数据</button>
+            </div>
+        </div>
+        
+        <!-- 添加右侧未来事件显示框 -->
+        <div class="future-events">
+            <h3>未来事件 (100天内)</h3>
+            <div class="future-events-list"></div>
+        </div>
+    </div>
+    <div id="eventForm" class="event-form-popup" style="display: none;">
+        <form id="newEventForm" class="event-form">
+            <div class="form-content">
+                <div class="form-group">
+                    <textarea name="quickInput" placeholder="例如：2025年5月15日泰国开学季，需要准备文具、书包、衣服等学习用品"></textarea>
+                </div>
+                <button type="button" id="parseTextBtn">解析文本</button>
+                
+                <div class="form-group">
+                    <label>事件类型：</label>
+                    <select name="eventType" required>
+                        <option value="holiday">节日</option>
+                        <option value="seasonal">季节性活动</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>地区：</label>
+                    <select name="region" required>
+                        <option value="thailand">泰国</option>
+                        <option value="malaysia">马来西亚</option>
+                        <option value="indonesia">印尼</option>
+                        <option value="philippines">菲律宾</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>事件名称：</label>
+                    <input type="text" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>日期：</label>
+                    <input type="date" name="date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>描述：</label>
+                    <textarea name="description"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>类别：</label>
+                    <input type="text" name="category">
+                </div>
+                
+                <div class="form-group">
+                    <label>产品：</label>
+                    <div id="productsList"></div>
+                    <button type="button" id="addProductBtn">添加产品类别</button>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" id="cancelEventBtn" class="cancel">取消</button>
+                <button type="submit" class="save">保存</button>
+            </div>
+        </form>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://tfvgjhyeaaourjblvctw.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmdmdqaHllYWFvdXJqYmx2Y3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NDQxNjAsImV4cCI6MjA1MDUyMDE2MH0.xxnwXUBWGDeZkM3KUDPtAU_e7PEyZlil70_VE8qCw-U'
+        window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    </script>
+    <script src="calendar-data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
