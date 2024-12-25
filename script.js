@@ -619,7 +619,7 @@ class Calendar {
                         <div class="product-list">
                             <div class="list-row">
                                 <span class="list-label">SKU:</span>
-                                <span class="list-content" contenteditable="true">${products.skus.join(',')}</span>
+                                <span class="list-content" contenteditable="false">${products.skus ? products.skus.join(',') : ''}</span>
                                 <button class="add-item" data-type="sku">
                                     <i class="fas fa-plus"></i>
                                 </button>
@@ -643,7 +643,7 @@ class Calendar {
                     <div class="product-list">
                         <div class="list-row">
                             <span class="list-label">SKU:</span>
-                            <span class="list-content" contenteditable="true"></span>
+                            <span class="list-content" contenteditable="false"></span>
                             <button class="add-item" data-type="sku">
                                 <i class="fas fa-plus"></i>
                             </button>
@@ -725,8 +725,9 @@ class Calendar {
         // 添加保存按钮的事件监听器
         popup.querySelector('.save-event').addEventListener('click', async (e) => {
             e.stopPropagation();
+            const { displayDate, ...eventData } = event; // 解构并移除displayDate
             const updatedEvent = {
-                ...event,
+                ...eventData,
                 name: popup.querySelector('.event-title').textContent,
                 date: popup.querySelector('.date-input').value,
                 description: popup.querySelector('.tips-content').textContent,
@@ -737,8 +738,10 @@ class Calendar {
             const productCategories = popup.querySelectorAll('.event-products:not(.history-products) .product-category');
             productCategories.forEach(category => {
                 const categoryName = category.querySelector('.category-name').textContent.replace('：', '').trim();
-                const productList = category.querySelector('.product-list').textContent.split('').map(p => p.trim());
-                updatedEvent.products[categoryName] = productList;
+                const productList = category.querySelector('.product-list').textContent.split('、').map(p => p.trim());
+                if (categoryName && productList.length > 0) {
+                    updatedEvent.products[categoryName] = productList;
+                }
             });
 
             // 收集往年热销产品信息
@@ -746,7 +749,8 @@ class Calendar {
             const historyCategories = popup.querySelectorAll('.history-products .product-category');
             historyCategories.forEach(category => {
                 const categoryName = category.querySelector('.category-name').textContent.trim();
-                const skuList = category.querySelector('.list-content').textContent.split(',').map(p => p.trim());
+                const skuContent = category.querySelector('.list-content').textContent;
+                const skuList = skuContent ? skuContent.split(',').map(p => p.trim()).filter(Boolean) : [];
                 if (categoryName && skuList.length > 0) {
                     historyProducts[categoryName] = {
                         skus: skuList
@@ -848,7 +852,7 @@ class Calendar {
                 <div class="product-list">
                     <div class="list-row">
                         <span class="list-label">SKU:</span>
-                        <span class="list-content" contenteditable="true"></span>
+                        <span class="list-content" contenteditable="false"></span>
                         <button class="add-item" data-type="sku">
                             <i class="fas fa-plus"></i>
                         </button>
@@ -951,11 +955,10 @@ class Calendar {
             eventDiv.innerHTML = `<span class="event-name">${eventName}</span>(${regionNames})`;
             eventDiv.title = `${eventName} (${regionNames})`;
             
-            // 添加点击事件处理，使用原始日期
-            const eventData = { ...event, date: event.displayDate };
+            // 修改点击事件处理，移除displayDate
             eventDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.createPopup(eventData, e);
+                this.createPopup(event, e);
             });
             
             dayElement.appendChild(eventDiv);
