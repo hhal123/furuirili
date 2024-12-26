@@ -542,16 +542,18 @@ class Calendar {
     }
 
     createPopup(event, clickEvent) {
-        // 移除现有的弹出框
+        // 如果已经有弹窗，先关闭
         if (this.currentPopup) {
             document.body.removeChild(this.currentPopup);
             this.currentPopup = null;
+            // 移除之前的点击事件监听器
+            document.removeEventListener('click', this._currentCloseHandler);
         }
 
         const popup = document.createElement('div');
         popup.className = 'event-popup';
-
-        // 添加内容
+        
+        // 设置弹窗内容
         let html = `
             <div class="event-header">
                 <div class="event-title" contenteditable="true">${event.name}</div>
@@ -566,293 +568,52 @@ class Calendar {
                 </div>
             </div>`;
 
-        // 添加小贴士
-        html += `
+        // 添加提示信息部分
+        if (event.description) {
+            html += `
             <div class="event-tips">
                 <i class="fas fa-lightbulb"></i>
-                <div class="tips-content" contenteditable="true">${event.description || ''}</div>
+                <div class="tips-content" contenteditable="true">${event.description}</div>
             </div>`;
-
-        // 添加产品信息
-        if (event.products && Object.keys(event.products).length > 0) {
-            html += '<div class="event-products">';
-            html += '<div class="products-title">热销产品</div>';
-            if (Array.isArray(event.products)) {
-                html += `<div class="product-list" contenteditable="true">所有品类：${event.products.join('、')}</div>`;
-            } else {
-                for (const [category, products] of Object.entries(event.products)) {
-                    if (products && products.length > 0) {
-                        html += `
-                            <div class="product-category">
-                                <div class="category-name" contenteditable="true">${category}：</div>
-                                <div class="product-list" contenteditable="true">${products.join('、')}</div>
-                            </div>`;
-                    }
-                }
-            }
-            html += '</div>';
         }
 
-        // 添加历史热销产品
-        html += `
-            <div class="event-products history-products">
-                <div class="products-title">
-                    <i class="fas fa-history"></i>
-                    往年热销产品
-                    <button class="add-history-product">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
-                <div class="history-products-list">`;
-        
-        // 添加历史产品数据
-        if (event.history_products && Object.keys(event.history_products).length > 0) {
-            for (const [category, products] of Object.entries(event.history_products)) {
+        // 添加产品信息部分
+        if (event.products && Object.keys(event.products).length > 0) {
+            html += `<div class="event-products">`;
+            for (const [category, products] of Object.entries(event.products)) {
                 html += `
-                    <div class="product-category">
-                        <div class="category-header">
-                            <div class="category-name" contenteditable="true">${category}</div>
-                            <button class="delete-category">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                        <div class="product-list">
-                            <div class="list-row">
-                                <span class="list-label">SKU:</span>
-                                <span class="list-content" contenteditable="false">${products.skus ? products.skus.join(',') : ''}</span>
-                                <button class="add-item" data-type="sku">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                                <button class="copy-sku" title="复制SKU">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>`;
-            }
-        } else {
-            // 新建事件时默认显示一个空的SKU类别
-            html += `
                 <div class="product-category">
                     <div class="category-header">
-                        <div class="category-name" contenteditable="true">SKU</div>
+                        <div class="category-name" contenteditable="true">${category}：</div>
                         <button class="delete-category">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
-                    <div class="product-list">
-                        <div class="list-row">
-                            <span class="list-label">SKU:</span>
-                            <span class="list-content" contenteditable="false"></span>
-                            <button class="add-item" data-type="sku">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                            <button class="copy-sku" title="复制SKU">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                        </div>
-                    </div>
+                    <div class="product-list" contenteditable="true">${products.join('、')}</div>
                 </div>`;
+            }
+            html += `</div>`;
         }
-        
+
+        // 添加历史产品信息部分
         html += `
-                </div>
-            </div>`;
-
-        // 修改底部操作按钮
-        html += `
-            <div class="event-actions">
-                <button class="save-event">保存</button>
-            </div>`;
-
-        popup.innerHTML = html;
-
-        // 添加到文档
-        document.body.appendChild(popup);
-
-        // 计算位置
-        const rect = clickEvent.target.getBoundingClientRect();
-        const scrollX = window.scrollX || window.pageXOffset;
-        const scrollY = window.scrollY || window.pageYOffset;
-        const popupRect = popup.getBoundingClientRect();
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-
-        // 计算初始位置
-        let left = rect.left + scrollX;
-        let top = rect.bottom + scrollY + 5;
-
-        // 检查右边界
-        if (left + popupRect.width > windowWidth + scrollX) {
-            left = windowWidth + scrollX - popupRect.width - 20;
-        }
-        // 检查左边界
-        if (left < scrollX) {
-            left = scrollX + 20;
-        }
-
-        // 检查底部边界
-        if (top + popupRect.height > windowHeight + scrollY) {
-            // 如果底部放不下，尝试放在点击位置的上方
-            const topSpace = rect.top - scrollY;
-            if (topSpace >= popupRect.height) {
-                // 上方空间足够
-                top = rect.top + scrollY - popupRect.height - 5;
-            } else {
-                // 上下都放不下，居中显示并确保可以滚动查看
-                top = Math.max(scrollY + 20, (windowHeight - popupRect.height) / 2 + scrollY);
-                // 确保弹出框以通过滚动完全看到
-                window.scrollTo({
-                    top: top - 20,
-                    behavior: 'smooth'
-                });
-            }
-        }
-
-        // 应位
-        popup.style.left = `${Math.max(0, left)}px`;
-        popup.style.top = `${Math.max(0, top)}px`;
-
-        // 添加事件处理
-        const closePopup = (e) => {
-            if (!popup.contains(e.target) && e.target !== clickEvent.target) {
-                document.body.removeChild(popup);
-                this.currentPopup = null;
-                document.removeEventListener('click', closePopup);
-            }
-        };
-
-        // 添加保存按钮的事件监听器
-        popup.querySelector('.save-event').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const { displayDate, ...eventData } = event; // 解构并移除displayDate
-            const updatedEvent = {
-                ...eventData,
-                name: popup.querySelector('.event-title').textContent,
-                date: popup.querySelector('.date-input').value,
-                description: popup.querySelector('.tips-content').textContent,
-                products: {}
-            };
-
-            // 收集产品信息
-            const productCategories = popup.querySelectorAll('.event-products:not(.history-products) .product-category');
-            productCategories.forEach(category => {
-                const categoryName = category.querySelector('.category-name').textContent.replace('：', '').trim();
-                const productList = category.querySelector('.product-list').textContent.split('、').map(p => p.trim());
-                if (categoryName && productList.length > 0) {
-                    updatedEvent.products[categoryName] = productList;
-                }
-            });
-
-            // 收集往年热销产品信息
-            const historyProducts = {};
-            const historyCategories = popup.querySelectorAll('.history-products .product-category');
-            historyCategories.forEach(category => {
-                const categoryName = category.querySelector('.category-name').textContent.trim();
-                const skuContent = category.querySelector('.list-content').textContent;
-                const skuList = skuContent ? skuContent.split(',').map(p => p.trim()).filter(Boolean) : [];
-                if (categoryName && skuList.length > 0) {
-                    historyProducts[categoryName] = {
-                        skus: skuList
-                    };
-                }
-            });
-            updatedEvent.history_products = historyProducts;
-
-            try {
-                const table = event.category === '节日' ? 'holidays' : 'seasonal_events';
-                const { data, error } = await this.supabase
-                    .from(table)
-                    .update(updatedEvent)
-                    .eq('id', event.id)
-                    .select();
-
-                if (error) throw error;
-
-                if (data && data.length > 0) {
-                    // 更新本地数据
-                    if (event.category === '节日') {
-                        this.events.holidays[event.region] = this.events.holidays[event.region]
-                            .map(h => h.id === event.id ? data[0] : h);
-                    } else {
-                        this.events.seasonal = this.events.seasonal
-                            .map(s => s.id === event.id ? data[0] : s);
-                    }
-
-                    // 关闭弹出框
-                    document.body.removeChild(popup);
-                    this.currentPopup = null;
-
-                    // 重新渲染日历
-                    this.renderCalendar();
-                }
-            } catch (error) {
-                console.error('保存事件错误:', error);
-                alert('保存事件失败: ' + error.message);
-            }
-        });
-
-        // 添加删除按钮的事件监听器
-        popup.querySelector('.delete-event').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.deleteEvent(event);
-        });
-
-        // 添加快速输入功能
-        const addItemHandler = (e) => {
-            const button = e.target.closest('.add-item');
-            if (button) {
-                e.stopPropagation();
-                const input = prompt('请输入SKU编码');
-                
-                if (input) {
-                    const listContent = button.parentElement.querySelector('.list-content');
-                    const currentContent = listContent.textContent.trim();
-                    
-                    if (currentContent) {
-                        listContent.textContent = currentContent + ',' + input.trim();
-                    } else {
-                        listContent.textContent = input.trim();
-                    }
-                }
-            }
-        };
-
-        // 为添加按钮添加点击事件
-        const addButtons = popup.querySelectorAll('.add-item');
-        addButtons.forEach(button => {
-            button.addEventListener('click', addItemHandler);
-        });
-
-        // 为复制按钮添加点击事件
-        const copyButtons = popup.querySelectorAll('.copy-sku');
-        copyButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const skuContent = e.target.closest('.list-row').querySelector('.list-content').textContent;
-                navigator.clipboard.writeText(skuContent.trim()).then(() => {
-                    alert('SKU已复制到剪贴板');
-                });
-            });
-        });
-
-        // 为新添加的类别添加SKU按钮的事件处理
-        popup.querySelector('.add-history-product').addEventListener('click', (e) => {
-            e.stopPropagation();
-            const historyProductsList = popup.querySelector('.history-products-list');
-            const newCategory = document.createElement('div');
-            newCategory.className = 'product-category';
-            newCategory.innerHTML = `
-                <div class="category-header">
-                    <div class="category-name" contenteditable="true"></div>
-                    <button class="delete-category">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <div class="product-list">
+        <div class="event-products history-products">
+            <h4>往年热销产品</h4>`;
+            
+        // 显示已有的历史产品数据
+        if (event.history_products && Object.keys(event.history_products).length > 0) {
+            for (const [category, data] of Object.entries(event.history_products)) {
+                html += `
+                <div class="product-category">
+                    <div class="category-header">
+                        <div class="category-name" contenteditable="true">${category}</div>
+                        <button class="delete-category">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                     <div class="list-row">
                         <span class="list-label">SKU:</span>
-                        <span class="list-content" contenteditable="false"></span>
+                        <span class="list-content" contenteditable="true">${data.skus ? data.skus.join(',') : ''}</span>
                         <button class="add-item" data-type="sku">
                             <i class="fas fa-plus"></i>
                         </button>
@@ -860,43 +621,273 @@ class Calendar {
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
-                </div>
-            `;
-
-            // 为新添加的SKU按钮添加事件监听器
-            const addButton = newCategory.querySelector('.add-item');
-            addButton.addEventListener('click', addItemHandler);
-
-            // 为新添加的复制按钮添加事件监听器
-            const copyButton = newCategory.querySelector('.copy-sku');
-            copyButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const skuContent = e.target.closest('.list-row').querySelector('.list-content').textContent;
-                navigator.clipboard.writeText(skuContent.trim()).then(() => {
-                    alert('SKU已复制到剪贴板');
-                });
-            });
-
-            historyProductsList.appendChild(newCategory);
-        });
-
-        // 添加删除历史产品类别的事件委托
-        popup.querySelector('.history-products-list').addEventListener('click', (e) => {
-            if (e.target.closest('.delete-category')) {
-                e.stopPropagation();
-                const category = e.target.closest('.product-category');
-                if (category) {
-                    category.remove();
-                }
+                </div>`;
             }
+        }
+
+        // 添加新类别的模板
+        html += `
+            <button class="add-category">
+                <i class="fas fa-plus"></i> 添加产品类别
+            </button>
+        </div>`;
+
+        // 添加保存按钮
+        html += `
+        <div class="form-actions">
+            <button class="save-event">保存</button>
+        </div>`;
+
+        popup.innerHTML = html;
+        document.body.appendChild(popup);
+        this.currentPopup = popup;
+
+        // 添加新类别的事件处理
+        const addCategoryBtn = popup.querySelector('.history-products .add-category');
+        if (addCategoryBtn) {
+            addCategoryBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const newCategory = document.createElement('div');
+                newCategory.className = 'product-category';
+                newCategory.innerHTML = `
+                    <div class="category-header">
+                        <div class="category-name" contenteditable="true">新产品类别</div>
+                        <button class="delete-category">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="list-row">
+                        <span class="list-label">SKU:</span>
+                        <span class="list-content" contenteditable="true"></span>
+                        <button class="add-item" data-type="sku">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button class="copy-sku" title="复制SKU">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                `;
+                
+                // 将新类别插入到"添加类别"按钮之前
+                addCategoryBtn.parentElement.insertBefore(newCategory, addCategoryBtn);
+                
+                // 为新添加的类别绑定删除事件
+                const deleteBtn = newCategory.querySelector('.delete-category');
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        newCategory.remove();
+                    });
+                }
+                
+                // 为新添加的SKU按钮绑定事件
+                const addSkuBtn = newCategory.querySelector('.add-item');
+                if (addSkuBtn) {
+                    addSkuBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const input = prompt('请输入SKU：');
+                        if (input) {
+                            const listContent = newCategory.querySelector('.list-content');
+                            const currentContent = listContent.textContent.trim();
+                            if (currentContent) {
+                                listContent.textContent = currentContent + ',' + input.trim();
+                            } else {
+                                listContent.textContent = input.trim();
+                            }
+                        }
+                    });
+                }
+                
+                // 为新添加的复制按钮绑定事件
+                const copyBtn = newCategory.querySelector('.copy-sku');
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const skuContent = newCategory.querySelector('.list-content').textContent.trim();
+                        if (skuContent) {
+                            navigator.clipboard.writeText(skuContent)
+                                .then(() => alert('SKU已复制到剪贴板'))
+                                .catch(err => console.error('复制失败:', err));
+                        }
+                    });
+                }
+            });
+        }
+
+        // 为现有的删除类别按钮绑定事件
+        popup.querySelectorAll('.history-products .delete-category').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                btn.closest('.product-category').remove();
+            });
         });
 
-        // 延迟添加点击事件监听器避免立即触发
-        setTimeout(() => {
-            document.addEventListener('click', closePopup);
-        }, 0);
+        // 为现有的添加SKU按钮绑定事件
+        popup.querySelectorAll('.history-products .add-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input = prompt('请输入SKU：');
+                if (input) {
+                    const listContent = btn.closest('.list-row').querySelector('.list-content');
+                    const currentContent = listContent.textContent.trim();
+                    if (currentContent) {
+                        listContent.textContent = currentContent + ',' + input.trim();
+                    } else {
+                        listContent.textContent = input.trim();
+                    }
+                }
+            });
+        });
 
-        this.currentPopup = popup;
+        // 为现有的复制按钮绑定事件
+        popup.querySelectorAll('.history-products .copy-sku').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const skuContent = btn.closest('.list-row').querySelector('.list-content').textContent.trim();
+                if (skuContent) {
+                    navigator.clipboard.writeText(skuContent)
+                        .then(() => alert('SKU已复制到剪贴板'))
+                        .catch(err => console.error('复制失败:', err));
+                }
+            });
+        });
+
+        // 计算弹窗位置
+        const rect = clickEvent.target.closest('.future-event, .calendar-day')?.getBoundingClientRect() || clickEvent.target.getBoundingClientRect();
+        const popupRect = popup.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // 默认显示在点击位置的右侧
+        let left = rect.right + 10;
+        let top = rect.top;
+
+        // 如果右侧空间不足，显示在左侧
+        if (left + popupRect.width > windowWidth - 20) {
+            left = rect.left - popupRect.width - 10;
+        }
+
+        // 如果左侧也没有足够空间，居中显示
+        if (left < 20) {
+            left = (windowWidth - popupRect.width) / 2;
+        }
+
+        // 确保弹窗不会超出顶部和底部
+        top = Math.max(20, Math.min(top, windowHeight - popupRect.height - 20));
+
+        popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+
+        // 创建新的关闭处理函数
+        this._currentCloseHandler = (e) => {
+            if (!popup.contains(e.target) && !e.target.closest('.future-event, .calendar-day')) {
+                document.body.removeChild(popup);
+                this.currentPopup = null;
+                document.removeEventListener('click', this._currentCloseHandler);
+            }
+        };
+
+        // 延迟添加事件监听器
+        setTimeout(() => {
+            document.addEventListener('click', this._currentCloseHandler);
+        }, 100);
+
+        // 处理删除事件
+        const deleteBtn = popup.querySelector('.delete-event');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('确定要删除这个事件吗？')) {
+                    await this.deleteEvent(event);
+                    document.body.removeChild(popup);
+                    this.currentPopup = null;
+                    document.removeEventListener('click', this._currentCloseHandler);
+                }
+            });
+        }
+
+        // 处理保存事件
+        const saveBtn = popup.querySelector('.save-event');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                
+                // 获取更新后的事件数据
+                const updatedEvent = {
+                    ...event,
+                    name: popup.querySelector('.event-title').textContent.trim(),
+                    date: popup.querySelector('.date-input').value,
+                    description: popup.querySelector('.tips-content')?.textContent.trim() || '',
+                    products: {},
+                    history_products: {}
+                };
+
+                // 收集产品信息
+                const productCategories = popup.querySelectorAll('.event-products:not(.history-products) .product-category');
+                productCategories.forEach(category => {
+                    const categoryName = category.querySelector('.category-name').textContent.replace('：', '').trim();
+                    const productList = category.querySelector('.product-list').textContent.split('、').map(p => p.trim());
+                    if (categoryName && productList.length > 0) {
+                        updatedEvent.products[categoryName] = productList;
+                    }
+                });
+
+                // 收集历史产品信息
+                const historyCategories = popup.querySelectorAll('.history-products .product-category');
+                historyCategories.forEach(category => {
+                    const categoryName = category.querySelector('.category-name').textContent.trim();
+                    const skuContent = category.querySelector('.list-content').textContent;
+                    const skuList = skuContent ? skuContent.split(',').map(p => p.trim()).filter(Boolean) : [];
+                    if (categoryName && skuList.length > 0) {
+                        updatedEvent.history_products[categoryName] = {
+                            skus: skuList
+                        };
+                    }
+                });
+
+                try {
+                    // 根据事件类型选择表
+                    const table = event.category === '节日' ? 'holidays' : 'seasonal_events';
+                    
+                    // 移除不需要的字段
+                    const { displayDate, daysDiff, ...eventData } = updatedEvent;
+                    
+                    // 更新数据库
+                    const { data, error } = await this.supabase
+                        .from(table)
+                        .update(eventData)
+                        .eq('id', event.id)
+                        .select();
+
+                    if (error) throw error;
+
+                    if (data && data.length > 0) {
+                        // 更新本地数据
+                        if (event.category === '节日') {
+                            this.events.holidays[event.region] = this.events.holidays[event.region]
+                                .map(h => h.id === event.id ? data[0] : h);
+                        } else {
+                            this.events.seasonal = this.events.seasonal
+                                .map(s => s.id === event.id ? data[0] : s);
+                        }
+
+                        // 关闭弹窗
+                        document.body.removeChild(popup);
+                        this.currentPopup = null;
+                        document.removeEventListener('click', this._currentCloseHandler);
+
+                        // 重新渲染日历
+                        this.renderCalendar();
+                        
+                        // 显示成功消息
+                        alert('保存成功！');
+                    }
+                } catch (error) {
+                    console.error('保存事件错误:', error);
+                    alert('保存事件失败: ' + error.message);
+                }
+            });
+        }
     }
 
     addEvents(dayElement, date) {
@@ -1324,87 +1315,63 @@ class Calendar {
     // 添加新方法：渲染未来事件列表
     renderFutureEvents() {
         const futureEventsList = document.querySelector('.future-events-list');
+        if (!futureEventsList) return;
+
         futureEventsList.innerHTML = '';
-        
         const today = new Date();
         const futureEvents = [];
-        
-        // 收集未来100天内的所有事件
+
+        // 收集所有事件
         for (const region in this.events.holidays) {
-            this.events.holidays[region].forEach(holiday => {
-                // 创建一个新的日期对象，使用当前年份
-                const eventDate = new Date(holiday.date);
-                eventDate.setFullYear(today.getFullYear());
-                
-                // 如果日期已经过去，使用明年的日期
-                if (eventDate < today) {
-                    eventDate.setFullYear(today.getFullYear() + 1);
-                }
-                
-                const daysDiff = this.calculateDaysDifference(today, eventDate);
+            this.events.holidays[region].forEach(event => {
+                const eventDate = new Date(event.date);
+                const daysDiff = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
                 if (daysDiff >= 0 && daysDiff <= 100) {
-                    futureEvents.push({
-                        ...holiday,
-                        daysDiff,
-                        date: eventDate
-                    });
+                    futureEvents.push({ ...event, daysDiff });
                 }
             });
         }
-        
+
         this.events.seasonal.forEach(event => {
-            // 创建一个新的日期对象，使用当前年份
             const eventDate = new Date(event.date);
-            eventDate.setFullYear(today.getFullYear());
-            
-            // 如果日期已经过去，使用明年的日期
-            if (eventDate < today) {
-                eventDate.setFullYear(today.getFullYear() + 1);
-            }
-            
-            const daysDiff = this.calculateDaysDifference(today, eventDate);
+            const daysDiff = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
             if (daysDiff >= 0 && daysDiff <= 100) {
-                futureEvents.push({
-                    ...event,
-                    daysDiff,
-                    date: eventDate
-                });
+                futureEvents.push({ ...event, daysDiff });
             }
         });
-        
+
         // 按日期排序
         futureEvents.sort((a, b) => a.daysDiff - b.daysDiff);
-        
+
         // 渲染事件列表
         futureEvents.forEach(event => {
             const eventElement = document.createElement('div');
-            eventElement.className = 'future-event-item';
-            
-            const regionName = this.getRegionName(event.region);
-            const dateStr = `${event.date.getMonth() + 1}月${event.date.getDate()}日`;
+            eventElement.className = 'future-event';
+            const eventDate = new Date(event.date);
+            const formattedDate = `${eventDate.getMonth() + 1}月${eventDate.getDate()}日`;
             
             eventElement.innerHTML = `
-                <div class="future-event-title">${event.name} (${regionName})</div>
-                <div class="future-event-date">${dateStr}</div>
-                <div class="future-event-countdown">还有 ${event.daysDiff} 天</div>
+                <div class="event-name">${event.name} (${this.getRegionName(event.region)})</div>
+                <div class="event-date">${formattedDate}</div>
+                <div class="countdown">还有 ${event.daysDiff} 天</div>
             `;
-            
-            // 添加点击事件，跳转到对应日期并显示详情
-            eventElement.addEventListener('click', () => {
-                // 设置日历显示月份
-                this.currentDate = new Date(event.date);
-                this.renderCalendar();
+
+            // 添加点击事件
+            eventElement.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
                 
-                // 创建事件弹窗
-                const dayElement = document.querySelector(`.calendar-day[data-date="${event.date.toISOString().split('T')[0]}"]`);
-                if (dayElement) {
-                    this.createPopup(event, { target: dayElement });
-                    
-                    // 滚动到对应日期
-                    dayElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 移除现有弹窗
+                if (this.currentPopup) {
+                    document.body.removeChild(this.currentPopup);
+                    this.currentPopup = null;
+                    // 移除之前的点击事件监听器
+                    document.removeEventListener('click', this._currentCloseHandler);
                 }
+                
+                // 创建新弹窗
+                this.createPopup(event, e);
             });
-            
+
             futureEventsList.appendChild(eventElement);
         });
     }
